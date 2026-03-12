@@ -114,8 +114,8 @@ class DashboardController extends Controller
         }
 
         $leaveRequests = (clone $query)
-            ->whereDate('start_date', $today->toDateString())
             ->with('user')
+            ->limit(50)
             ->get()
             ->map(fn($l) => [
                 'id' => $l->id,

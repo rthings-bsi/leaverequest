@@ -124,9 +124,50 @@
 
                     <div class="mt-4 flex items-center justify-end gap-3">
                         <div class="flex items-center gap-3">
-                            @php $current = auth()->user(); @endphp
+                            @php
+                                $current = auth()->user();
+                                $sameDepartment = $current && $current->department === $leave->department;
+                                $ownerIsApprover =
+                                    optional($leave->user) &&
+                                    method_exists($leave->user, 'hasAnyRole') &&
+                                    $leave->user->hasAnyRole(['manager', 'supervisor', 'hod']);
 
-                            {{-- Supervisor approval UI removed for supervisor accounts per request. --}}
+                                $canSupervisorApprove =
+                                    $current &&
+                                    $current->hasRole('supervisor') &&
+                                    !$current->hasAnyRole(['manager', 'hod', 'administrator', 'admin', 'hr']) &&
+                                    $sameDepartment &&
+                                    !$ownerIsApprover &&
+                                    empty($leave->supervisor_approved_at);
+
+                                $canSupervisorReject = $canSupervisorApprove;
+                            @endphp
+
+                            @if ($canSupervisorApprove)
+                                <form method="POST" action="{{ route('approvals.approve', $leave->id) }}"
+                                    onsubmit="return confirm('Approve this leave as supervisor?');">
+                                    @csrf
+                                    <input type="hidden" name="stage" value="supervisor">
+                                    <input type="hidden" name="comment" value="Supervisor approved via detail">
+                                    <button type="submit"
+                                        class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700">
+                                        Approve as Supervisor
+                                    </button>
+                                </form>
+                            @endif
+
+                            @if ($canSupervisorReject)
+                                <form method="POST" action="{{ route('approvals.reject', $leave->id) }}"
+                                    onsubmit="return confirm('Reject this leave as supervisor?');">
+                                    @csrf
+                                    <input type="hidden" name="stage" value="supervisor">
+                                    <input type="hidden" name="comment" value="Supervisor rejected via detail">
+                                    <button type="submit"
+                                        class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md text-sm hover:bg-red-50">
+                                        Reject as Supervisor
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
 

@@ -162,6 +162,41 @@
                                         $current = auth()->user();
                                         $isSupervisor = $current->hasRole('supervisor');
                                         $isOwner = auth()->id() === $leave->user_id;
+                                        $isAdminHr = $current->hasAnyRole(['administrator', 'admin', 'hr']);
+                                        $isManagerLike = $current->hasAnyRole(['manager', 'hod']);
+                                        $isSupervisorOnly =
+                                            $isSupervisor &&
+                                            !$current->hasAnyRole(['manager', 'hod', 'administrator', 'admin', 'hr']);
+                                        $sameDepartment =
+                                            empty($current->department) ||
+                                            empty($leave->department) ||
+                                            $current->department === $leave->department;
+
+                                        $ownerIsApprover = false;
+                                        if (optional($leave->user) && method_exists($leave->user, 'hasAnyRole')) {
+                                            $ownerIsApprover = $leave->user->hasAnyRole([
+                                                'manager',
+                                                'supervisor',
+                                                'hod',
+                                            ]);
+                                        }
+
+                                        $canSupervisorApprove =
+                                            $isSupervisorOnly &&
+                                            $sameDepartment &&
+                                            !$ownerIsApprover &&
+                                            empty($leave->supervisor_approved_at);
+
+                                        $managerCanApproveNow =
+                                            $ownerIsApprover || !empty($leave->supervisor_approved_at);
+                                        $canManagerApprove =
+                                            $isManagerLike &&
+                                            $sameDepartment &&
+                                            $managerCanApproveNow &&
+                                            empty($leave->manager_approved_at);
+
+                                        $canApprove = $isAdminHr || $canSupervisorApprove || $canManagerApprove;
+                                        $canReject = $canApprove;
                                     @endphp
 
                                     {{-- If the current user is the owner, allow Edit/Delete even when they also have approver roles --}}
@@ -190,9 +225,9 @@
                                                 Delete
                                             </button>
                                         </form>
-                                    @elseif ($current->hasAnyRole(['administrator', 'admin', 'hr']))
+                                    @elseif ($canApprove)
                                         {{-- Approve / Reject buttons (responsive: full width on phones, inline on sm+) --}}
-                                        @if ($isSupervisor && $leave->supervisor_approved_at)
+                                        @if ($isSupervisorOnly && $leave->supervisor_approved_at)
                                             {{-- Supervisor already approved: show disabled approved button --}}
                                             <div class="inline-block ms-0 sm:ms-2 w-full sm:w-auto">
                                                 <button type="button" disabled
@@ -241,12 +276,17 @@
                                                     @endif
                                                 </div>
                                             </div>
-                                        @else
+                                        @elseif ($canApprove)
                                             <form method="POST" action="{{ route('approvals.approve', $leave->id) }}"
                                                 class="inline-block ms-0 sm:ms-2 w-full sm:w-auto"
                                                 onsubmit="return confirm('Approve this leave?');">
                                                 @csrf
                                                 <input type="hidden" name="ajax" value="1">
+                                                @if ($canSupervisorApprove)
+                                                    <input type="hidden" name="stage" value="supervisor">
+                                                @elseif ($canManagerApprove)
+                                                    <input type="hidden" name="stage" value="manager">
+                                                @endif
                                                 <input type="hidden" name="comment" value="Approved via approvals list">
                                                 <button type="submit"
                                                     class="inline-flex justify-center items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-full text-sm w-full sm:w-auto hover:from-emerald-600 hover:to-emerald-700 transition whitespace-nowrap">
@@ -260,22 +300,29 @@
                                             </form>
                                         @endif
 
-                                        <form method="POST" action="{{ route('approvals.reject', $leave->id) }}"
-                                            class="inline-block ms-0 sm:ms-2 w-full sm:w-auto"
-                                            onsubmit="return confirm('Reject this leave?');">
-                                            @csrf
-                                            <input type="hidden" name="ajax" value="1">
-                                            <input type="hidden" name="comment" value="Rejected via approvals list">
-                                            <button type="submit"
-                                                class="inline-flex justify-center items-center gap-2 px-3 py-2 bg-white border border-red-100 rounded-full text-sm text-red-600 w-full sm:w-auto hover:bg-red-50 transition whitespace-nowrap">
-                                                <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                                Reject
-                                            </button>
-                                        </form>
+                                        @if ($canReject)
+                                            <form method="POST" action="{{ route('approvals.reject', $leave->id) }}"
+                                                class="inline-block ms-0 sm:ms-2 w-full sm:w-auto"
+                                                onsubmit="return confirm('Reject this leave?');">
+                                                @csrf
+                                                <input type="hidden" name="ajax" value="1">
+                                                @if ($canSupervisorApprove)
+                                                    <input type="hidden" name="stage" value="supervisor">
+                                                @elseif ($canManagerApprove)
+                                                    <input type="hidden" name="stage" value="manager">
+                                                @endif
+                                                <input type="hidden" name="comment" value="Rejected via approvals list">
+                                                <button type="submit"
+                                                    class="inline-flex justify-center items-center gap-2 px-3 py-2 bg-white border border-red-100 rounded-full text-sm text-red-600 w-full sm:w-auto hover:bg-red-50 transition whitespace-nowrap">
+                                                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg"
+                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                    Reject
+                                                </button>
+                                            </form>
+                                        @endif
                                     @else
                                         {{-- For regular employees, offer Edit and Delete on their own submission only --}}
                                         @if (auth()->id() === $leave->user_id)

@@ -659,7 +659,7 @@
                         if (activityContainer) {
                             if ((data.leaveRequests || []).length === 0) {
                                 activityContainer.innerHTML =
-                                    '<div class="text-sm text-gray-500">No leave requests found for today.</div>';
+                                    '<div class="text-sm text-gray-500">No leave requests found.</div>';
                             } else {
                                 activityContainer.innerHTML = (data.leaveRequests || []).map(lr => {
                                     const type = (lr.type || lr.leave_type || 'leave');

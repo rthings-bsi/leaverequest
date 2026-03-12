@@ -813,7 +813,7 @@
                     if (activityContainer) {
                         if ((data.leaveRequests || []).length === 0) {
                             activityContainer.innerHTML =
-                                '<div class="text-sm text-gray-500">No leave requests found for today.</div>';
+                                '<div class="text-sm text-gray-500">No leave requests found.</div>';
                         } else {
                             activityContainer.innerHTML = (data.leaveRequests || []).map(lr =>
                                 `\n<div class="p-4 border rounded-lg flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">\n  <div class="min-w-0">\n    <div class="font-semibold truncate">${lr.user_name} — ${lr.type.charAt(0).toUpperCase()+lr.type.slice(1)}</div>\n    <div class="text-xs text-gray-400 truncate">${lr.start_date ?? ''} to ${lr.end_date ?? ''}</div>\n    ${lr.notes ? `<div class="text-xs text-gray-400 mt-2 truncate">${lr.notes}</div>` : ''}\n  </div>\n  <div class="flex-shrink-0">\n    <div class="px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-sm">${(lr.status||'pending').charAt(0).toUpperCase()+ (lr.status||'pending').slice(1)}</div>\n  </div>\n</div>`

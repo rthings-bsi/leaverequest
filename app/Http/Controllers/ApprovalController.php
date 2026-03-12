@@ -306,6 +306,23 @@ class ApprovalController extends Controller
             'stage' => 'nullable|string',
         ]);
 
+        // Guard supervisor approvals before writing audit rows.
+        if ($user->hasAnyRole(['supervisor'])) {
+            if ($leave->department !== $user->department) {
+                abort(403, 'Supervisor can only approve leaves in the same department.');
+            }
+
+            $owner = $leave->user;
+            $ownerIsApprover = false;
+            if ($owner && method_exists($owner, 'hasAnyRole')) {
+                $ownerIsApprover = $owner->hasAnyRole(['manager', 'supervisor', 'hod']);
+            }
+
+            if ($ownerIsApprover) {
+                abort(403, 'Supervisor cannot approve manager/supervisor/HOD leave requests.');
+            }
+        }
+
         $approval = Approval::create([
             'leave_request_id' => $leave->id,
             'approver_id' => $user->id,
@@ -320,6 +337,10 @@ class ApprovalController extends Controller
         // - admin/hr/administrator: finalize immediately
         try {
             if ($user->hasAnyRole(['supervisor'])) {
+                if (!empty($leave->supervisor_approved_at)) {
+                    return back()->with('success', 'Supervisor approval already recorded.');
+                }
+
                 // Supervisor approves first stage
                 $leave->approveBySupervisor($user, $data['comment'] ?? null);
             } elseif ($user->hasAnyRole(['administrator', 'admin', 'hr'])) {
@@ -354,8 +375,8 @@ class ApprovalController extends Controller
             return redirect()->route('approvals.show', $leave->id)->with('error', 'Failed to process approval.');
         }
 
-        // Prefer JSON response for AJAX clients. Also accept explicit ajax=1 input
-        if ($request->wantsJson() || $request->ajax() || $request->input('ajax') == '1') {
+        // Return JSON only for real AJAX/JSON requests.
+        if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
                 'leave_id' => $leave->id,
