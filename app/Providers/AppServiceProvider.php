@@ -6,6 +6,7 @@ use Filament\Facades\Filament;
 use Filament\Panel;
 use Filament\PanelRegistry;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -17,11 +18,44 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Force HTTPS in URLs when APP_URL is HTTPS (useful behind ngrok/SSL tunnels)
+        // 1. Force HTTPS (Logika aslimu tetap dipertahankan)
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
 
+        // 2. PERBAIKAN VERCEL: Alihkan Cache & Views ke /tmp
+        if (env('VIEW_COMPILED_PATH') === '/tmp') {
+            // Buat subfolder di /tmp karena /tmp root terkadang punya limitasi
+            $tmpViewPath = '/tmp/views';
+            $tmpCachePath = '/tmp/cache';
+
+            if (!is_dir($tmpViewPath)) {
+                @mkdir($tmpViewPath, 0777, true);
+            }
+            if (!is_dir($tmpCachePath)) {
+                @mkdir($tmpCachePath, 0777, true);
+            }
+
+            // Paksa Laravel menggunakan folder ini saat runtime
+            Config::set('view.compiled', $tmpViewPath);
+            Config::set('cache.stores.file.path', $tmpCachePath);
+        } else {
+            // Logika aslimu untuk lokal (memastikan folder storage ada)
+            $dirs = [
+                storage_path('framework/views'),
+                storage_path('framework/cache'),
+                storage_path('framework/sessions'),
+                storage_path('logs'),
+            ];
+
+            foreach ($dirs as $dir) {
+                if (!is_dir($dir)) {
+                    @mkdir($dir, 0755, true);
+                }
+            }
+        }
+
+        // 3. Filament Registration (Logika aslimu tetap dipertahankan)
         if (class_exists(Panel::class) && class_exists(Filament::class)) {
             try {
                 if ($this->app->bound(PanelRegistry::class)) {
@@ -30,20 +64,7 @@ class AppServiceProvider extends ServiceProvider
                     Filament::registerPanel(Panel::make()->id('admin')->default());
                 }
             } catch (\Throwable $e) {
-                // Swallow: if registration fails, don't break app boot
-            }
-        }
-
-        $dirs = [
-            storage_path('framework/views'),
-            storage_path('framework/cache'),
-            storage_path('framework/sessions'),
-            storage_path('logs'),
-        ];
-
-        foreach ($dirs as $dir) {
-            if (!is_dir($dir)) {
-                @mkdir($dir, 0755, true);
+                // Swallow error agar tidak break saat boot
             }
         }
     }
