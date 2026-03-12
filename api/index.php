@@ -32,5 +32,10 @@ foreach ($directories as $dir) {
 // Point Laravel storage to /tmp
 $_ENV['APP_STORAGE'] = '/tmp';
 
+$tmpViewsDir = '/tmp/views';
+if (!is_dir($tmpViewsDir)) {
+    mkdir($tmpViewsDir, 0775, true);
+}
+
 require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/../public/index.php';
