@@ -1,27 +1,19 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
 
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-
-    <title>{{ config('app.name', 'Laravel') }}</title>
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-
+{{-- PERBAIKAN VITE UNTUK VERCEL --}}
+@if (app()->environment('local'))
+    {{-- Di lokal, kita cek apakah manifest ada (Vite running) --}}
     @if (file_exists(public_path('build/manifest.json')))
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @else
-        <!-- Fallback: static compiled CSS so the app layout doesn't break when Vite dev server isn't running.
-             To generate this file run in your project root:
-                 npx tailwindcss -i resources/css/app.css -o public/css/tailwind.css --minify
-             or run the full production build: npm run build
-        -->
         <link rel="stylesheet" href="{{ asset('css/tailwind.css') }}">
     @endif
+@else
+    {{-- Di Vercel (Production), lupakan file_exists, langsung panggil @vite --}}
+    {{-- Vite secara otomatis akan mencari manifest.json di folder public/build --}}
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+@endif
 
     {{-- Alpine fallback: if the compiled JS didn't initialize Alpine (e.g. Vite not running or assets missing),
          load a small CDN copy so interactive components (dropdowns, etc.) keep working. This is a low-risk

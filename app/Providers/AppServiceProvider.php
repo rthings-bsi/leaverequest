@@ -2,9 +2,6 @@
 
 namespace App\Providers;
 
-use Filament\Facades\Filament;
-use Filament\Panel;
-use Filament\PanelRegistry;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
@@ -18,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // 1. Force HTTPS (Logika aslimu tetap dipertahankan)
+        // 1. Force HTTPS
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
@@ -39,8 +36,11 @@ class AppServiceProvider extends ServiceProvider
             // Paksa Laravel menggunakan folder ini saat runtime
             Config::set('view.compiled', $tmpViewPath);
             Config::set('cache.stores.file.path', $tmpCachePath);
+
+            // Pastikan Vite manifest bisa dibaca dari path yang benar
+            Config::set('app.asset_url', env('APP_URL'));
         } else {
-            // Logika aslimu untuk lokal (memastikan folder storage ada)
+            // Logika untuk lokal (memastikan folder storage ada)
             $dirs = [
                 storage_path('framework/views'),
                 storage_path('framework/cache'),
@@ -52,19 +52,6 @@ class AppServiceProvider extends ServiceProvider
                 if (!is_dir($dir)) {
                     @mkdir($dir, 0755, true);
                 }
-            }
-        }
-
-        // 3. Filament Registration (Logika aslimu tetap dipertahankan)
-        if (class_exists(Panel::class) && class_exists(Filament::class)) {
-            try {
-                if ($this->app->bound(PanelRegistry::class)) {
-                    app(PanelRegistry::class)->register(Panel::make()->id('admin')->default());
-                } else {
-                    Filament::registerPanel(Panel::make()->id('admin')->default());
-                }
-            } catch (\Throwable $e) {
-                // Swallow error agar tidak break saat boot
             }
         }
     }
